@@ -22,22 +22,30 @@ win_length: 2048
 
 # Dataset Configuration
 train_dataset:
-  _target_: torch.utils.data.ConcatDataset
+  _target_: fish_speech.datasets.concat_repeat.ConcatRepeatDataset
   datasets:
     - _target_: fish_speech.datasets.vqgan.VQGANDataset
-      filelist: data/gigaspeech/vq_train_filelist.txt
+      filelist: data/source/Genshin/filelist.train.txt
       sample_rate: ${sample_rate}
       hop_length: ${hop_length}
       slice_frames: 512
     - _target_: fish_speech.datasets.vqgan.VQGANDataset
-      filelist: data/sft/vq_train_filelist.txt
+      filelist: data/source/gigaspeech/filelist.train.txt
       sample_rate: ${sample_rate}
       hop_length: ${hop_length}
       slice_frames: 512
+    - _target_: fish_speech.datasets.vqgan.VQGANDataset
+      filelist: data/source/wenet-speech/filelist.train.txt
+      sample_rate: ${sample_rate}
+      hop_length: ${hop_length}
+      slice_frames: 512
+  
+  # Repeat the high-quality dataset more times
+  repeats: [10, 1, 1]
 
 val_dataset:
   _target_: fish_speech.datasets.vqgan.VQGANDataset
-  filelist: data/sft/vq_val_filelist.txt
+  filelist: data/source/Genshin/filelist.test.txt
   sample_rate: ${sample_rate}
   hop_length: ${hop_length}
 
@@ -72,6 +80,7 @@ model:
     n_codebooks: 1
     n_groups: 2
     levels: [8, 5, 5, 5]
+    downsample_factor: [2,]
 
   decoder:
     _target_: fish_speech.models.vqgan.modules.wavenet.WaveNet

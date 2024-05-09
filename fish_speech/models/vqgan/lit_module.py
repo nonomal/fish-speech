@@ -1,6 +1,7 @@
 import itertools
 import math
-from typing import Any, Callable
+import re
+from typing import Any, Callable, Mapping
 
 import lightning as L
 import torch
@@ -440,3 +441,19 @@ class VQGAN(L.LightningModule):
             return self.vocoder(gen_mel)
 
         return gen_mel
+
+    def load_state_dict(
+        self, state_dict: Mapping[str, Any], strict: bool = True, assign: bool = False
+    ):
+        my_state_dict = self.state_dict()
+
+        # Dynamically remove project layers if they don't match
+        for key in list(state_dict.keys()):
+            if (
+                re.match(r"quantizer\.residual_fsq\.rvqs\.\d+\.project_", key)
+                and key in my_state_dict
+                and my_state_dict[key].shape != state_dict[key].shape
+            ):
+                state_dict.pop(key)
+
+        return super().load_state_dict(state_dict, strict, assign)
