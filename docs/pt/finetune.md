@@ -1,11 +1,11 @@
-# Ajuste Fino
+# Ajuste Fino (Fine-tuning)
 
-É óbvio que ao abrir esta página, você não deve estar muito satisfeito com o desempenho do modelo pré-treinado com poucos exemplos. Você pode querer ajustar o modelo para melhorar seu desempenho em seu conjunto de dados.
+Obviamente, ao abrir esta página, você não estava satisfeito com o desempenho do modelo pré-treinado em modo zero-shot. Você deseja fazer um ajuste fino em um modelo para melhorar seu desempenho em seu conjunto de dados.
 
-Na atual versão, a única coisa que você precisa ajustar é a parte do 'LLAMA'.
+Na versão atual, você só precisa fazer o ajuste fino da parte 'LLAMA'.
 
 ## Ajuste Fino do LLAMA
-### 1. Preparando o conjunto de dados
+### 1. Prepare o conjunto de dados
 
 ```
 .
@@ -21,22 +21,23 @@ Na atual versão, a única coisa que você precisa ajustar é a parte do 'LLAMA'
     └── 38.79-40.85.mp3
 ```
 
-Você precisa converter seu conjunto de dados para o formato acima e colocá-lo em `data`. O arquivo de áudio pode ter as extensões `.mp3`, `.wav` ou `.flac`, e o arquivo de anotação deve ter a extensão `.lab`.
+Você precisa converter seu conjunto de dados para o formato acima e colocá-lo no diretório `data`. O arquivo de áudio pode ter as extensões `.mp3`, `.wav` ou `.flac`, e o arquivo de anotação deve ter a extensão `.lab`.
+
+!!! info
+    O arquivo de anotação `.lab` precisa conter apenas a transcrição do áudio, sem necessidade de formatação especial. Por exemplo, se `hi.mp3` contiver "Olá, adeus.", então o arquivo `hi.lab` conterá uma única linha de texto: "Olá, adeus.".
 
 !!! warning
-    É recomendado aplicar normalização de volume ao conjunto de dados. Você pode usar o [fish-audio-preprocess](https://github.com/fishaudio/audio-preprocess) para fazer isso.
-
+    Recomenda-se aplicar a normalização de volume (loudness) ao conjunto de dados. Você pode usar o [fish-audio-preprocess](https://github.com/fishaudio/audio-preprocess) para fazer isso.
     ```bash
     fap loudness-norm data-raw data --clean
     ```
 
-
 ### 2. Extração em lote de tokens semânticos
 
-Certifique-se de ter baixado os pesos do VQGAN. Se não, execute o seguinte comando:
+Certifique-se de que você baixou os pesos do VQGAN. Se não, execute o seguinte comando:
 
 ```bash
-huggingface-cli download fishaudio/fish-speech-1.2-sft --local-dir checkpoints/fish-speech-1.2-sft
+huggingface-cli download fishaudio/openaudio-s1-mini --local-dir checkpoints/openaudio-s1-mini
 ```
 
 Em seguida, você pode executar o seguinte comando para extrair os tokens semânticos:
@@ -44,13 +45,12 @@ Em seguida, você pode executar o seguinte comando para extrair os tokens semân
 ```bash
 python tools/vqgan/extract_vq.py data \
     --num-workers 1 --batch-size 16 \
-    --config-name "firefly_gan_vq" \
-    --checkpoint-path "checkpoints/fish-speech-1.2-sft/firefly-gan-vq-fsq-4x1024-42hz-generator.pth"
+    --config-name "modded_dac_vq" \
+    --checkpoint-path "checkpoints/openaudio-s1-mini/codec.pth"
 ```
 
 !!! note
-    Você pode ajustar `--num-workers` e `--batch-size` para aumentar a velocidade de extração, mas certifique-se de não exceder o limite de memória da sua GPU.  
-    Para o formato VITS, você pode especificar uma lista de arquivos usando `--filelist xxx.list`.
+    Você pode ajustar `--num-workers` e `--batch-size` para aumentar a velocidade de extração, mas certifique-se de não exceder o limite de memória da sua GPU.
 
 Este comando criará arquivos `.npy` no diretório `data`, como mostrado abaixo:
 
@@ -72,7 +72,7 @@ Este comando criará arquivos `.npy` no diretório `data`, como mostrado abaixo:
     └── 38.79-40.85.npy
 ```
 
-### 3. Empacotar o conjunto de dados em protobuf
+### 3. Empacote o conjunto de dados em protobuf
 
 ```bash
 python tools/llama/build_dataset.py \
@@ -82,17 +82,17 @@ python tools/llama/build_dataset.py \
     --num-workers 16
 ```
 
-Após executar o comando, você deverá ver o arquivo `quantized-dataset-ft.protos` no diretório `data`.
+Após a conclusão da execução do comando, você deverá ver o arquivo `protos` no diretório `data`.
 
-### 4. E finalmente, chegamos ao ajuste fino com LoRA
+### 4. Finalmente, ajuste fino com LoRA
 
-Da mesma forma, certifique-se de ter baixado os pesos do `LLAMA`. Se não, execute o seguinte comando:
+Da mesma forma, certifique-se de que você baixou os pesos do `LLAMA`. Se não, execute o seguinte comando:
 
 ```bash
-huggingface-cli download fishaudio/fish-speech-1.2-sft --local-dir checkpoints/fish-speech-1.2-sft
+huggingface-cli download fishaudio/openaudio-s1-mini --local-dir checkpoints/openaudio-s1-mini
 ```
 
-E então, execute o seguinte comando para iniciar o ajuste fino:
+Finalmente, você pode iniciar o ajuste fino executando o seguinte comando:
 
 ```bash
 python fish_speech/train.py --config-name text2semantic_finetune \
@@ -101,25 +101,24 @@ python fish_speech/train.py --config-name text2semantic_finetune \
 ```
 
 !!! note
-    Se quiser, você pode modificar os parâmetros de treinamento, como `batch_size`, `gradient_accumulation_steps`, etc., para se ajustar à memória da sua GPU, modificando `fish_speech/configs/text2semantic_finetune.yaml`.
+    Você pode modificar os parâmetros de treinamento, como `batch_size`, `gradient_accumulation_steps`, etc., para se adequar à memória da sua GPU, modificando `fish_speech/configs/text2semantic_finetune.yaml`.
 
 !!! note
-    Para usuários do Windows, é recomendado usar `trainer.strategy.process_group_backend=gloo` para evitar problemas com `nccl`.
+    Para usuários do Windows, você pode usar `trainer.strategy.process_group_backend=gloo` para evitar problemas com `nccl`.
 
-Após concluir o treinamento, consulte a seção [inferência](inference.md), e use `--speaker SPK1` para gerar fala.
+Após o treinamento ser concluído, você pode consultar a seção de [inferência](inference.md) para testar seu modelo.
 
 !!! info
-    Por padrão, o modelo aprenderá apenas os padrões de fala do orador e não o timbre. Ainda pode ser preciso usar prompts para garantir a estabilidade do timbre.
-    Se quiser que ele aprenda o timbre, aumente o número de etapas de treinamento, mas isso pode levar ao overfitting (sobreajuste).
+    Por padrão, o modelo aprenderá apenas os padrões de fala do locutor e não o timbre. Você ainda precisará usar prompts para garantir a estabilidade do timbre.
+    Se você quiser aprender o timbre, pode aumentar o número de passos de treinamento, mas isso pode levar a um sobreajuste (overfitting).
 
-Após o treinamento, é preciso converter os pesos do LoRA em pesos regulares antes de realizar a inferência.
+Após o treinamento, você precisa converter os pesos do LoRA para pesos regulares antes de realizar a inferência.
 
 ```bash
 python tools/llama/merge_lora.py \
-    --lora-config r_8_alpha_16 \
-    --base-weight checkpoints/fish-speech-1.2-sft \
-    --lora-weight results/$project/checkpoints/step_000000010.ckpt \
-    --output checkpoints/fish-speech-1.2-sft-yth-lora/
-```
+	--lora-config r_8_alpha_16 \
+	--base-weight checkpoints/openaudio-s1-mini \
+	--lora-weight results/$project/checkpoints/step_000000010.ckpt \
+	--output checkpoints/openaudio-s1-mini-yth-lora/```
 !!! note
-    É possível também tentar outros checkpoints. Sugerimos usar o checkpoint que melhor atenda aos seus requisitos, pois eles geralmente têm um desempenho melhor em dados fora da distribuição (OOD).
+    Você também pode tentar outros checkpoints. Sugerimos usar o checkpoint mais antigo que atenda aos seus requisitos, pois eles geralmente têm um desempenho melhor em dados fora de distribuição (OOD).
